@@ -169,14 +169,31 @@ static int xvip_pipeline_start_stop(struct xvip_composite_device *xdev,
 		 * start or stop the subdev only once in case if they are
 		 * shared between sub-graphs
 		 */
-		if (start != is_streaming) {
-			ret = v4l2_subdev_call(subdev, video, s_stream,
-					       start);
-			if (start && ret < 0 && ret != -ENOIOCTLCMD) {
-				dev_err(xdev->dev, "s_stream is failed on subdev\n");
-				xvip_subdev_set_streaming(xdev, subdev, !start);
+		if (start && !is_streaming) {
+			ret = v4l2_subdev_call(subdev, core, s_power, 1);
+			if (ret < 0 && ret != -ENOIOCTLCMD) {
+				dev_err(xdev->dev,
+					"s_power on failed on subdev\n");
+				xvip_subdev_set_streaming(xdev, subdev, 0);
 				return ret;
 			}
+			ret = v4l2_subdev_call(subdev, video, s_stream, 1);
+			if (ret < 0 && ret != -ENOIOCTLCMD) {
+				dev_err(xdev->dev, 
+					"s_stream on failed on subdev\n");
+				v4l2_subdev_call(subdev, core, s_power, 0);
+				xvip_subdev_set_streaming(xdev, subdev, 0);
+				return ret;
+			}
+		} else if (!start && is_streaming) {
+			ret = v4l2_subdev_call(subdev, video, s_stream, 0);
+			if (ret < 0 && ret != -ENOIOCTLCMD)
+				dev_err(xdev->dev,
+					"s_stream off failed on subdev\n");
+			ret = v4l2_subdev_call(subdev, core, s_power, 0);
+			if (ret < 0 && ret != -ENOIOCTLCMD)
+				dev_err(xdev->dev,
+					"s_power off failed on subdev\n");
 		}
 	}
 
